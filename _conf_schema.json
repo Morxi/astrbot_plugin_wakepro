@@ -199,13 +199,13 @@
                 "description": "引用别人时不唤醒",
                 "hint": "当消息中引用了别人的消息,且没有引用、艾特或提及 bot， bot将不会被唤醒",
                 "type": "bool",
-                "default": true
+                "default": false
             },
             "disable_at_other_wake": {
                 "description": "艾特别人时不唤醒",
                 "hint": "当消息中艾特了别人,且没有引用、艾特或提及 bot， bot将不会被唤醒",
                 "type": "bool",
-                "default": true
+                "default": false
             }
         }
     },
