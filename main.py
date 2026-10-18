@@ -25,6 +25,14 @@ class WakePlugin(Star):
         self.commands = self._get_all_commands()
         self.pipeline = Pipeline(self.cfg)
 
+    async def initialize(self) -> None:
+        """Initialize the wake pipeline and its optional Jev client."""
+        await self.pipeline.initialize()
+
+    async def terminate(self) -> None:
+        """Release resources held by the wake pipeline."""
+        await self.pipeline.terminate()
+
     @staticmethod
     def _get_all_commands() -> list[str]:
         """遍历所有注册的处理器获取所有命令"""
@@ -63,6 +71,19 @@ class WakePlugin(Star):
         group = StateManager.get_group(gid) if gid else None
         if group and uid not in group.members:
             group.members[uid] = MemberState(uid=uid)
+        if group:
+            message_id = str(getattr(event.message_obj, "message_id", "") or "")
+            group.history.append(
+                {
+                    "message_id": message_id or f"{uid}:{time.time_ns()}",
+                    "sender_id": str(uid),
+                    "sender_name": event.get_sender_name() or "",
+                    "text": plain,
+                    "time": time.time(),
+                    "is_bot": False,
+                    "bot_id": str(bid),
+                }
+            )
 
         ctx = WakeContext(
             event=event,
@@ -98,6 +119,17 @@ class WakePlugin(Star):
 
         group = StateManager.get_group(gid)
         group.bot_msgs.append(result.get_plain_text())
+        group.history.append(
+            {
+                "message_id": f"bot:{event.get_self_id()}:{time.time_ns()}",
+                "sender_id": str(event.get_self_id()),
+                "sender_name": "",
+                "text": result.get_plain_text(),
+                "time": time.time(),
+                "is_bot": True,
+                "bot_id": str(event.get_self_id()),
+            }
+        )
 
         member = group.members.get(uid)
         if member:

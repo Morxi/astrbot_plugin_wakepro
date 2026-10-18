@@ -66,6 +66,8 @@ class GroupState(BaseModel):
     """闭嘴到期时间"""
     bot_msgs: deque = Field(default_factory=lambda: deque(maxlen=5))
     """机器人消息缓存队列"""
+    history: deque = Field(default_factory=lambda: deque(maxlen=30))
+    """用于 Jev 语义判定的群聊消息历史"""
     model_config = ConfigDict(arbitrary_types_allowed=True)
     """模型配置"""
 
@@ -218,6 +220,7 @@ class StepName(str, Enum):
     MENTION = "mention"
     SILENCE = "silence"
     WAKE = "wake"
+    JEV = "jev"
 
 
 @dataclass(slots=True)

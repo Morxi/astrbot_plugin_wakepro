@@ -9,6 +9,7 @@ from .step import (
     BlockStep,
     CommandStep,
     DebounceStep,
+    JevStep,
     MentionStep,
     SilenceStep,
     WakeStep,
@@ -29,6 +30,7 @@ class Pipeline:
         BlockStep,
         MentionStep,
         WakeStep,
+        JevStep,
         CommandStep,
         SilenceStep,
     ]
@@ -83,3 +85,13 @@ class Pipeline:
             # 中断流水线
             if result.abort:
                 break
+
+    async def initialize(self) -> None:
+        """Initialize pipeline steps that own external resources."""
+        for step in self._steps:
+            await step.initialize()
+
+    async def terminate(self) -> None:
+        """Release resources owned by pipeline steps."""
+        for step in reversed(self._steps):
+            await step.terminate()
