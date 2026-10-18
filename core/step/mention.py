@@ -26,12 +26,12 @@ class MentionStep(BaseStep):
             if isinstance(seg, At):
                 if str(seg.qq) == ctx.bid:
                     has_self_reference = True
-                elif str(seg.qq) != "all":
+                elif ctx.gid and str(seg.qq) not in ("all", ctx.uid):
                     has_other_at = True
             elif isinstance(seg, Reply):
                 if str(seg.sender_id) == ctx.bid:
                     has_self_reference = True
-                else:
+                elif ctx.gid and str(seg.sender_id) != ctx.uid:
                     has_other_reply = True
 
         if has_self_reference:
