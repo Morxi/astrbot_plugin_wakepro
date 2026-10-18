@@ -30,6 +30,7 @@ class JevStep(BaseStep):
         """
         if (
             not self.cfg.jev_api_key
+            or ctx.cmd
             or ctx.debounce_follow_up
             or ctx.event.is_at_or_wake_command
             or not ctx.group

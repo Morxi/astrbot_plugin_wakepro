@@ -54,6 +54,7 @@ class WakePlugin(Star):
         gid = event.get_group_id()
         uid = event.get_sender_id()
         bid = event.get_self_id()
+        platform_id = str(event.get_platform_id() or "")
 
         if uid == bid:
             return
@@ -68,10 +69,14 @@ class WakePlugin(Star):
         first_arg = event.message_str.split(" ", 1)[0]
         cmd = first_arg if first_arg in self.commands else None
 
-        group = StateManager.get_group(gid) if gid else None
+        group = (
+            StateManager.get_group(gid, platform_id=platform_id, bot_id=str(bid))
+            if gid
+            else None
+        )
         if group and uid not in group.members:
             group.members[uid] = MemberState(uid=uid)
-        if group:
+        if group and not cmd:
             message_id = str(getattr(event.message_obj, "message_id", "") or "")
             group.history.append(
                 {
@@ -117,7 +122,11 @@ class WakePlugin(Star):
         if not gid or not uid or not result:
             return
 
-        group = StateManager.get_group(gid)
+        group = StateManager.get_group(
+            gid,
+            platform_id=str(event.get_platform_id() or ""),
+            bot_id=str(event.get_self_id()),
+        )
         group.bot_msgs.append(result.get_plain_text())
         group.history.append(
             {
