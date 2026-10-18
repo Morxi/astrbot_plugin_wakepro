@@ -12,13 +12,14 @@
         "items": {
             "steps": {
                 "description": "启用的步骤",
-                "hint": "勾选表示启用该步骤，执行顺序已强制固定为：消息防抖 -> 阻塞判断 -> 提及唤醒 -> 智能唤醒 -> 指令屏蔽 -> 沉默检测",
+                "hint": "勾选表示启用该步骤，执行顺序已强制固定为：消息防抖 -> 阻塞判断 -> 提及唤醒 -> 智能唤醒 -> JEV唤醒 -> 指令屏蔽 -> 沉默检测",
                 "type": "list",
                 "options": [
                     "debounce(消息防抖)",
                     "block(阻塞判断)",
                     "mention(提及唤醒)",
                     "wake(智能唤醒)",
+                    "jev(JEV唤醒)",
                     "command(指令屏蔽)",
                     "silence(沉默检测)"
                 ],
@@ -27,6 +28,7 @@
                     "block(阻塞判断)",
                     "mention(提及唤醒)",
                     "wake(智能唤醒)",
+                    "jev(JEV唤醒)",
                     "command(指令屏蔽)",
                     "silence(沉默检测)"
                 ]
@@ -46,6 +48,7 @@
                     "block(阻塞判断)",
                     "mention(提及唤醒)",
                     "wake(智能唤醒)",
+                    "jev(JEV唤醒)",
                     "command(指令屏蔽)",
                     "silence(沉默检测)"
                 ],
@@ -70,11 +73,14 @@
                     "block(阻塞判断)",
                     "mention(提及唤醒)",
                     "wake(智能唤醒)",
+                    "jev(JEV唤醒)",
                     "command(指令屏蔽)",
                     "silence(沉默检测)"
                 ],
                 "default": [
-                    "wake(智能唤醒)"
+                    "mention(提及唤醒)",
+                    "wake(智能唤醒)",
+                    "jev(JEV唤醒)"
                 ]
             }
         }
@@ -288,6 +294,75 @@
                     "step": 0.0001
                 },
                 "default": 0.0005
+            }
+        }
+    },
+    "jev": {
+        "description": "【JEV唤醒】",
+        "hint": "结合群聊上下文判断普通消息是否在对机器人说话",
+        "type": "object",
+        "items": {
+            "jev_api_key": {
+                "description": "JEV API Key",
+                "hint": "留空时跳过 JEV 判定。",
+                "type": "string",
+                "default": ""
+            },
+            "jev_api_url": {
+                "description": "JEV 请求地址",
+                "hint": "填写完整的 HTTP(S) 接口地址，不会自动追加路径；默认使用 TypeSafe AI 官方接口。",
+                "type": "string",
+                "default": "https://api.typesafe.ai/v1/systemone"
+            },
+            "jev_model": {
+                "description": "JEV 模型版本",
+                "hint": "填写固定版本号，例如 jev-1.13.0；jev-latest",
+                "type": "string",
+                "default": "jev-latest"
+            },
+            "jev_threshold": {
+                "description": "JEV 唤醒阈值",
+                "hint": "JEV 返回概率达到此值时才唤醒，范围为 0 到 1；值越高越保守。",
+                "type": "float",
+                "slider": {
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.01
+                },
+                "default": 0.7
+            },
+            "jev_timeout_seconds": {
+                "description": "JEV 请求超时（秒）",
+                "hint": "单次请求等待时间上限，超时后按重试次数处理。",
+                "type": "float",
+                "slider": {
+                    "min": 1,
+                    "max": 60,
+                    "step": 1
+                },
+                "default": 10
+            },
+            "jev_retries": {
+                "description": "JEV 失败重试次数",
+                "hint": "请求失败后的额外尝试次数，设为 0 表示不重试。",
+                "type": "int",
+                "slider": {
+                    "min": 0,
+                    "max": 3,
+                    "step": 1
+                },
+                "default": 0
+            },
+            "history_messages": {
+                "description": "JEV 历史消息条数",
+                "hint": "发送给 JEV 的历史群聊消息数量，不包含当前待判断消息；数量越大越占用请求额度。",
+                "type": "int",
+                "slider": {
+                    "min": 1,
+                    "max": 100,
+                    "step": 1
+                },
+                "default": 10
             }
         }
     },

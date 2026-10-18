@@ -25,6 +25,14 @@ class WakePlugin(Star):
         self.commands = self._get_all_commands()
         self.pipeline = Pipeline(self.cfg)
 
+    async def initialize(self) -> None:
+        """Initialize the wake pipeline and its optional Jev client."""
+        await self.pipeline.initialize()
+
+    async def terminate(self) -> None:
+        """Release resources held by the wake pipeline."""
+        await self.pipeline.terminate()
+
     @staticmethod
     def _get_all_commands() -> list[str]:
         """遍历所有注册的处理器获取所有命令"""
@@ -46,6 +54,7 @@ class WakePlugin(Star):
         gid = event.get_group_id()
         uid = event.get_sender_id()
         bid = event.get_self_id()
+        platform_id = str(event.get_platform_id() or "")
 
         if uid == bid:
             return
@@ -60,9 +69,26 @@ class WakePlugin(Star):
         first_arg = event.message_str.split(" ", 1)[0]
         cmd = first_arg if first_arg in self.commands else None
 
-        group = StateManager.get_group(gid) if gid else None
+        group = (
+            StateManager.get_group(gid, platform_id=platform_id, bot_id=str(bid))
+            if gid
+            else None
+        )
         if group and uid not in group.members:
             group.members[uid] = MemberState(uid=uid)
+        if group and not cmd:
+            message_id = str(getattr(event.message_obj, "message_id", "") or "")
+            group.history.append(
+                {
+                    "message_id": message_id or f"{uid}:{time.time_ns()}",
+                    "sender_id": str(uid),
+                    "sender_name": event.get_sender_name() or "",
+                    "text": plain,
+                    "time": time.time(),
+                    "is_bot": False,
+                    "bot_id": str(bid),
+                }
+            )
 
         ctx = WakeContext(
             event=event,
@@ -96,8 +122,23 @@ class WakePlugin(Star):
         if not gid or not uid or not result:
             return
 
-        group = StateManager.get_group(gid)
+        group = StateManager.get_group(
+            gid,
+            platform_id=str(event.get_platform_id() or ""),
+            bot_id=str(event.get_self_id()),
+        )
         group.bot_msgs.append(result.get_plain_text())
+        group.history.append(
+            {
+                "message_id": f"bot:{event.get_self_id()}:{time.time_ns()}",
+                "sender_id": str(event.get_self_id()),
+                "sender_name": "",
+                "text": result.get_plain_text(),
+                "time": time.time(),
+                "is_bot": True,
+                "bot_id": str(event.get_self_id()),
+            }
+        )
 
         member = group.members.get(uid)
         if member:

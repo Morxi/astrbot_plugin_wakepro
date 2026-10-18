@@ -66,6 +66,8 @@ class GroupState(BaseModel):
     """闭嘴到期时间"""
     bot_msgs: deque = Field(default_factory=lambda: deque(maxlen=5))
     """机器人消息缓存队列"""
+    history: deque = Field(default_factory=lambda: deque(maxlen=30))
+    """用于 Jev 语义判定的群聊消息历史"""
     model_config = ConfigDict(arbitrary_types_allowed=True)
     """模型配置"""
 
@@ -73,15 +75,26 @@ class GroupState(BaseModel):
 class StateManager:
     """内存状态管理"""
 
-    _groups: dict[str, GroupState] = {}
+    _groups: dict[tuple[str, str, str], GroupState] = {}
     _pending_requests: dict[str, "PendingWakeRequest"] = {}
     _pending_lock = asyncio.Lock()
 
     @classmethod
-    def get_group(cls, gid: str) -> GroupState:
-        if gid not in cls._groups:
-            cls._groups[gid] = GroupState(gid=gid)
-        return cls._groups[gid]
+    def get_group(cls, gid: str, *, platform_id: str, bot_id: str) -> GroupState:
+        """Return isolated state for one platform, bot account, and group.
+
+        Args:
+            gid: Platform-specific group ID.
+            platform_id: AstrBot platform instance ID.
+            bot_id: Bot account ID on the platform.
+
+        Returns:
+            The in-memory state for this isolated group scope.
+        """
+        state_key = (platform_id, bot_id, gid)
+        if state_key not in cls._groups:
+            cls._groups[state_key] = GroupState(gid=gid)
+        return cls._groups[state_key]
 
     @staticmethod
     def get_pending_key(umo: str, uid: str) -> str:
@@ -218,6 +231,7 @@ class StepName(str, Enum):
     MENTION = "mention"
     SILENCE = "silence"
     WAKE = "wake"
+    JEV = "jev"
 
 
 @dataclass(slots=True)

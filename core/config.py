@@ -175,6 +175,16 @@ class WakeConfig(ConfigNode):
         self._interest_words = [w.split() for w in self.interest_words_str]
 
 
+class JevConfig(ConfigNode):
+    jev_api_key: str
+    jev_api_url: str
+    jev_model: str
+    jev_threshold: float
+    jev_timeout_seconds: float
+    jev_retries: int
+    history_messages: int
+
+
 class SilenceConfig(ConfigNode):
     shutup: float
     insult: float
@@ -195,6 +205,7 @@ class PluginConfig(ConfigNode):
     block: BlockConfig
     mention: MentionConfig
     wake: WakeConfig
+    jev: JevConfig
     debounce: DebounceConfig
     silence: SilenceConfig
 
