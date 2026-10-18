@@ -351,7 +351,7 @@
                     "max": 3,
                     "step": 1
                 },
-                "default": 1
+                "default": 0
             },
             "history_messages": {
                 "description": "JEV 历史消息条数",
