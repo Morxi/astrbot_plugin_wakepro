@@ -183,6 +183,17 @@ class JevConfig(ConfigNode):
     jev_timeout_seconds: float
     jev_retries: int
     history_messages: int
+    allow_empty_key: bool
+    question_type: str
+    custom_rules: str
+    custom_question: str
+    calibration_center: float
+    calibration_sharpness: float
+    adaptive_margin: float
+    adaptive_window: int
+    adaptive_min_samples: int
+    min_chars: int
+    debug_log: bool
 
 
 class SilenceConfig(ConfigNode):

@@ -304,9 +304,15 @@
         "items": {
             "jev_api_key": {
                 "description": "JEV API Key",
-                "hint": "留空时跳过 JEV 判定。",
+                "hint": "留空时跳过 JEV 判定（除非开启“允许无 Key 请求”）。",
                 "type": "string",
                 "default": ""
+            },
+            "allow_empty_key": {
+                "description": "允许无 Key 请求",
+                "hint": "本地部署的 JEV/Kev 服务通常不需要 Key。开启后 API Key 留空也会发起请求，且不发送 Authorization 头。",
+                "type": "bool",
+                "default": false
             },
             "jev_api_url": {
                 "description": "JEV 请求地址",
@@ -322,7 +328,7 @@
             },
             "jev_threshold": {
                 "description": "JEV 唤醒阈值",
-                "hint": "JEV 返回概率达到此值时才唤醒，范围为 0 到 1；值越高越保守。",
+                "hint": "校准后的概率达到此值时才唤醒，范围为 0 到 1；值越高越保守。本地小模型输出概率通常偏低且集中，请配合下方“概率校准”或调低阈值。",
                 "type": "float",
                 "slider": {
                     "min": 0,
@@ -363,6 +369,101 @@
                     "step": 1
                 },
                 "default": 10
+            },
+            "question_type": {
+                "description": "判定问题类型",
+                "hint": "noul：是/否概率（推荐）；choice：在“对机器人/对他人”间二选一，取“对机器人”的概率；both：两种问题在同一请求中一起判定并取平均（不增加请求次数）。",
+                "type": "string",
+                "options": [
+                    "noul",
+                    "choice",
+                    "both"
+                ],
+                "default": "noul"
+            },
+            "custom_rules": {
+                "description": "自定义判定规则",
+                "hint": "作为 state.rules 发送给 JEV，留空使用内置规则。可补充本群特点，例如机器人的昵称、常见的提问方式。",
+                "type": "text",
+                "default": ""
+            },
+            "custom_question": {
+                "description": "自定义判定问题",
+                "hint": "作为问题指令发送给 JEV，留空使用内置问题。",
+                "type": "string",
+                "default": ""
+            },
+            "calibration_center": {
+                "description": "概率校准中心",
+                "hint": "原始概率等于此值时校准为 50%。本地小模型（如 kev-0.8b）的“非对机器人”消息通常在 0.25~0.35，“对机器人”消息在 0.35~0.7，此时可设为 0.33 左右。保持 0.5 且锐度为 1 时不做校准。",
+                "type": "float",
+                "slider": {
+                    "min": 0.01,
+                    "max": 0.99,
+                    "step": 0.01
+                },
+                "default": 0.5
+            },
+            "calibration_sharpness": {
+                "description": "概率校准锐度",
+                "hint": "在 logit 空间中放大与校准中心的距离，用于拉开被压缩的概率。本地高温度模型可设为 3~5；1 表示不放大。",
+                "type": "float",
+                "slider": {
+                    "min": 0.1,
+                    "max": 10,
+                    "step": 0.1
+                },
+                "default": 1.0
+            },
+            "adaptive_margin": {
+                "description": "自适应唤醒边际",
+                "hint": "大于 0 时启用自适应检测：以本群最近 JEV 原始概率的中位数作为基线，当前消息的原始概率高出基线至少此值时也会唤醒（与阈值判定为“或”关系）。本地小模型建议 0.05~0.1；0 表示关闭。",
+                "type": "float",
+                "slider": {
+                    "min": 0,
+                    "max": 0.5,
+                    "step": 0.01
+                },
+                "default": 0.0
+            },
+            "adaptive_window": {
+                "description": "自适应基线样本数",
+                "hint": "计算群基线时使用最近多少条 JEV 判定结果。",
+                "type": "int",
+                "slider": {
+                    "min": 5,
+                    "max": 200,
+                    "step": 1
+                },
+                "default": 30
+            },
+            "adaptive_min_samples": {
+                "description": "自适应最少样本数",
+                "hint": "本群累计判定结果少于此数量时，只使用阈值判定。",
+                "type": "int",
+                "slider": {
+                    "min": 1,
+                    "max": 100,
+                    "step": 1
+                },
+                "default": 10
+            },
+            "min_chars": {
+                "description": "最短消息长度",
+                "hint": "纯文本少于此字数的消息不发送给 JEV，可减少“哈哈”“？”等无意义请求；0 表示不限制。",
+                "type": "int",
+                "slider": {
+                    "min": 0,
+                    "max": 20,
+                    "step": 1
+                },
+                "default": 0
+            },
+            "debug_log": {
+                "description": "输出判定详情",
+                "hint": "在日志中输出原始概率、校准后概率、群基线与判定结果，便于调参。",
+                "type": "bool",
+                "default": false
             }
         }
     },

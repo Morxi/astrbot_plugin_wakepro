@@ -68,6 +68,8 @@ class GroupState(BaseModel):
     """机器人消息缓存队列"""
     history: deque = Field(default_factory=lambda: deque(maxlen=30))
     """用于 Jev 语义判定的群聊消息历史"""
+    jev_scores: deque = Field(default_factory=lambda: deque(maxlen=200))
+    """Jev 历史原始概率，用于自适应基线"""
     model_config = ConfigDict(arbitrary_types_allowed=True)
     """模型配置"""
 
