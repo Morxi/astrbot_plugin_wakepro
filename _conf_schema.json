@@ -359,6 +359,17 @@
                 },
                 "default": 0
             },
+            "history_source": {
+                "description": "历史消息来源",
+                "hint": "auto：AstrBot 开启“持久化群聊消息记录”时读取 AstrBot 默认记忆库（重启不丢失，包含机器人回复、@ 和引用），否则使用插件内存；astrbot：始终读取 AstrBot 记忆库；plugin：只使用插件内存。",
+                "type": "string",
+                "options": [
+                    "auto",
+                    "astrbot",
+                    "plugin"
+                ],
+                "default": "auto"
+            },
             "history_messages": {
                 "description": "JEV 历史消息条数",
                 "hint": "发送给 JEV 的历史群聊消息数量，不包含当前待判断消息；数量越大越占用请求额度。",
@@ -369,6 +380,28 @@
                     "step": 1
                 },
                 "default": 10
+            },
+            "bot_nicknames": {
+                "description": "机器人昵称",
+                "hint": "告诉 JEV 机器人在群里叫什么，对判定准确率影响很大。会与自动获取的昵称、提及唤醒词合并。",
+                "type": "list",
+                "default": []
+            },
+            "auto_nickname": {
+                "description": "自动获取机器人昵称",
+                "hint": "在 aiocqhttp(QQ) 平台上自动读取机器人的群名片和昵称，每个群只读取一次。",
+                "type": "bool",
+                "default": true
+            },
+            "bot_aliases": {
+                "description": "机器人泛称",
+                "hint": "群友对机器人的通用叫法，一并作为机器人名字发送给 JEV。",
+                "type": "list",
+                "default": [
+                    "机器人",
+                    "bot",
+                    "AI"
+                ]
             },
             "question_type": {
                 "description": "判定问题类型",

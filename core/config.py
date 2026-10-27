@@ -194,6 +194,10 @@ class JevConfig(ConfigNode):
     adaptive_min_samples: int
     min_chars: int
     debug_log: bool
+    history_source: str
+    bot_nicknames: list[str]
+    auto_nickname: bool
+    bot_aliases: list[str]
 
 
 class SilenceConfig(ConfigNode):

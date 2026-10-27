@@ -1,11 +1,12 @@
 import asyncio
 import math
+import re
 import statistics
 
 from astrbot.api import logger
 
 from ..config import PluginConfig
-from ..jev import JevClient
+from ..jev import JevClient, render_chain, render_history_row
 from ..model import StepName, StepResult, WakeContext
 from .base import BaseStep
 
@@ -32,6 +33,11 @@ def calibrate(probability: float, center: float, sharpness: float) -> float:
     return 1 / (1 + math.exp(-max(min(z, 50), -50)))
 
 
+def _is_name(value: object) -> bool:
+    """Reject wake prefixes such as ``/`` that are not names the bot is called."""
+    return isinstance(value, str) and bool(re.search(r"\w", value))
+
+
 class JevStep(BaseStep):
     """Use group context and Jev to detect messages addressed to the bot."""
 
@@ -41,6 +47,7 @@ class JevStep(BaseStep):
         super().__init__(config)
         self.cfg = config.jev
         self.client = JevClient(self.cfg)
+        self._nicknames: dict[tuple[str, str], list[str]] = {}
 
     @property
     def available(self) -> bool:
@@ -52,6 +59,95 @@ class JevStep(BaseStep):
         """Check that the configured Jev model is served."""
         if self.available and self.config.pipeline.is_enabled_step(self.name):
             await self.client.check_model()
+
+    async def _detect_nicknames(self, ctx: WakeContext) -> list[str]:
+        """Fetch the bot's group card and nickname from OneBot, cached per group."""
+        if self.cfg.auto_nickname is False:
+            return []
+        key = (str(ctx.bid), str(ctx.gid))
+        if key in self._nicknames:
+            return self._nicknames[key]
+        names: list[str] = []
+        bot = getattr(ctx.event, "bot", None)
+        call = getattr(bot, "call_action", None)
+        if call is not None:
+            try:
+                info = await asyncio.wait_for(
+                    call(
+                        "get_group_member_info",
+                        group_id=int(ctx.gid),
+                        user_id=int(ctx.bid),
+                        no_cache=False,
+                    ),
+                    5,
+                )
+                if isinstance(info, dict):
+                    names += [info.get("card") or "", info.get("nickname") or ""]
+            except asyncio.CancelledError:
+                raise
+            except Exception as error:
+                logger.debug("Jev failed to fetch bot nickname: %s", error)
+        names = [name for name in dict.fromkeys(names) if _is_name(name)]
+        if names or call is None:
+            self._nicknames[key] = names
+        return names
+
+    async def _bot_names(self, ctx: WakeContext) -> list[str]:
+        names = [
+            *(self.cfg.bot_nicknames or []),
+            *(await self._detect_nicknames(ctx)),
+            *self.config.mention.names,
+            *self.config.mention.admin_names,
+            *self.config.wake_prefix,
+            *(self.cfg.bot_aliases or []),
+        ]
+        return [name for name in dict.fromkeys(names) if _is_name(name)]
+
+    def _astrbot_history_enabled(self, ctx: WakeContext) -> bool:
+        source = str(self.cfg.history_source or "auto").split("(", 1)[0].strip()
+        if source == "plugin":
+            return False
+        if source == "astrbot":
+            return True
+        try:
+            settings = self.config.context.get_config(umo=ctx.umo).get(
+                "provider_ltm_settings", {}
+            )
+        except Exception:
+            return False
+        return bool(settings.get("group_message_history_enable"))
+
+    async def _history(self, ctx: WakeContext, message_id: str, limit: int) -> list:
+        """Read context from AstrBot's persisted group history, else plugin memory."""
+        if self._astrbot_history_enabled(ctx):
+            manager = getattr(self.config.context, "message_history_manager", None)
+            if manager is not None:
+                try:
+                    rows = await manager.get(
+                        platform_id=ctx.event.get_platform_id(),
+                        user_id=ctx.umo,
+                        page=1,
+                        page_size=limit + 1,
+                    )
+                except asyncio.CancelledError:
+                    raise
+                except Exception as error:
+                    logger.warning("Jev failed to read AstrBot history: %s", error)
+                else:
+                    current = ctx.event.get_extra(
+                        "_current_platform_message_history_id"
+                    )
+                    records = [
+                        record
+                        for row in rows
+                        if getattr(row, "id", None) != current
+                        and (record := render_history_row(row)) is not None
+                    ]
+                    if records:
+                        return records[-limit:]
+        return [
+            item for item in ctx.group.history if item.get("message_id") != message_id
+        ][-limit:]
 
     async def handle(self, ctx: WakeContext) -> StepResult:
         """Classify the current group message with Jev when configured.
@@ -93,16 +189,13 @@ class JevStep(BaseStep):
             "message_id": message_id,
             "sender_id": str(ctx.uid),
             "sender_name": ctx.event.get_sender_name() or "",
-            "text": ctx.plain,
+            "text": render_chain(ctx.chain) or ctx.plain,
             "time": ctx.now,
             "is_bot": False,
             "bot_id": str(ctx.bid),
         }
-        history = [
-            item for item in ctx.group.history if item.get("message_id") != message_id
-        ][-history_messages:]
-        names = [*self.config.wake_prefix, *self.config.mention.names]
-        names.extend(self.config.mention.admin_names)
+        history = await self._history(ctx, message_id, history_messages)
+        names = await self._bot_names(ctx)
         try:
             raw = await self.client.judge(history, candidate, str(ctx.bid), names)
         except asyncio.CancelledError:

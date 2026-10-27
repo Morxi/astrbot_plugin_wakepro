@@ -10,6 +10,7 @@ from astrbot.core.star.filter.command_group import CommandGroupFilter
 from astrbot.core.star.star_handler import star_handlers_registry
 
 from .core.config import PluginConfig
+from .core.jev import render_chain
 from .core.model import (
     MemberState,
     StateManager,
@@ -83,7 +84,7 @@ class WakePlugin(Star):
                     "message_id": message_id or f"{uid}:{time.time_ns()}",
                     "sender_id": str(uid),
                     "sender_name": event.get_sender_name() or "",
-                    "text": plain,
+                    "text": render_chain(chain) or plain,
                     "time": time.time(),
                     "is_bot": False,
                     "bot_id": str(bid),

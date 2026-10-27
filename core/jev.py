@@ -5,11 +5,14 @@ from __future__ import annotations
 import asyncio
 import json
 import math
+import time
 from collections.abc import Iterable
+from datetime import datetime, timezone
 
 import aiohttp
 
 from astrbot.api import logger
+from astrbot.core.message.components import At, Plain, Reply
 
 from .config import JevConfig
 
@@ -28,6 +31,63 @@ CHOICE_CRITERIA = {
     "human": "目标候选在对群里其他人说话，或只是闲聊、谈论机器人",
 }
 QUESTION_TYPES = ("noul", "choice", "both")
+
+
+def render_chain(chain: Iterable[object]) -> str:
+    """Render text, @ mentions and quoted replies so Jev can see who is addressed."""
+    parts: list[str] = []
+    for seg in chain:
+        if isinstance(seg, Plain):
+            parts.append(seg.text)
+        elif isinstance(seg, At):
+            parts.append(f"@{seg.name or seg.qq}")
+        elif isinstance(seg, Reply):
+            quoted = " ".join(str(seg.message_str or "").split())[:60]
+            parts.append(f"[回复 {seg.sender_nickname or seg.sender_id}: {quoted}]")
+    return " ".join(p.strip() for p in parts if p and p.strip())
+
+
+def render_history_row(row: object) -> dict | None:
+    """Convert an AstrBot ``PlatformMessageHistory`` row into a Jev record."""
+    content = getattr(row, "content", None)
+    if not isinstance(content, dict):
+        return None
+    parts: list[str] = []
+    for part in content.get("message") or []:
+        if not isinstance(part, dict):
+            continue
+        if part.get("type") == "plain":
+            parts.append(str(part.get("text") or ""))
+        elif part.get("type") == "at":
+            parts.append(f"@{part.get('name') or part.get('user_id')}")
+        elif part.get("type") == "reply":
+            quoted = " ".join(str(part.get("text") or "").split())[:60]
+            parts.append(f"[回复 {part.get('sender_name') or ''}: {quoted}]")
+    text = " ".join(p.strip() for p in parts if p and p.strip())
+    if not text:
+        return None
+    created = getattr(row, "created_at", None)
+    if isinstance(created, datetime):
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        stamp = created.timestamp()
+    else:
+        stamp = None
+    return {
+        "message_id": f"h{getattr(row, 'id', '')}",
+        "sender_id": str(getattr(row, "sender_id", "") or ""),
+        "sender_name": str(getattr(row, "sender_name", "") or ""),
+        "text": text,
+        "time": stamp,
+        "is_bot": content.get("type") == "bot",
+    }
+
+
+def clock(value: object) -> object:
+    """Format a Unix timestamp as local ``HH:MM:SS``; small models read it better."""
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return time.strftime("%H:%M:%S", time.localtime(value))
+    return value
 
 
 def json_bytes(value: object) -> int:
@@ -95,29 +155,36 @@ class JevClient:
         bot_id: str,
         bot_names: Iterable[str],
     ) -> dict:
-        records = [
-            {
-                key: value
-                for key, value in message.items()
-                if key not in ("bot_id", "is_bot")
-            }
-            for message in history
-        ]
-        candidate_record = {
-            key: value
-            for key, value in candidate.items()
-            if key not in ("bot_id", "is_bot")
-        }
+        names = list(dict.fromkeys(bot_names))
+        records = [self._record(message, bot_id, names) for message in history]
+        candidate_record = self._record(candidate, bot_id, names)
         return {
             "model": self.cfg.jev_model,
             "state": {
-                "bot": {"id": bot_id, "names": list(dict.fromkeys(bot_names))},
+                "bot": {"id": bot_id, "names": names},
                 "rules": (self.cfg.custom_rules or "").strip() or INSTRUCTIONS,
                 "history": records,
                 "candidates": [candidate_record],
             },
             "questions": self._questions(candidate["message_id"]),
         }
+
+    @staticmethod
+    def _record(message: dict, bot_id: str, names: list[str]) -> dict:
+        record = {
+            key: value
+            for key, value in message.items()
+            if key not in ("bot_id", "is_bot")
+        }
+        if message.get("is_bot") or record.get("sender_id") == bot_id:
+            record["sender_id"] = bot_id
+            if names and record.get("sender_name") in ("", "bot", None):
+                record["sender_name"] = names[0]
+        if record.get("time") is None:
+            record.pop("time", None)
+        else:
+            record["time"] = clock(record["time"])
+        return record
 
     @classmethod
     def _fits(cls, payload: dict) -> bool:
